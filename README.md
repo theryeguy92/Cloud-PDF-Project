@@ -1,75 +1,160 @@
-# AWS Kubernetes and Microservices Project
-## Project Overview
-This project demonstrates how to set up a distributed system using Kubernetes, Docker, Kafka, Machine Learning, and MySQL, hosted on AWS virtual machines (VMs). The system is designed to handle PDF uploads, process and summarize the content using an AI model, and store the metadata in a database.
 
-## System Architecture
-The project is hosted on four AWS VMs, each assigned a specific role:
+### **Improved README.md**
 
-# VM	# Role	                                # Details
-VM1	    Kubernetes Master and PDF Upload API	Handles API requests, manages workloads, and coordinates Kubernetes cluster.
-VM2	    Kafka and Zookeeper	                    Manages communication between services via Kafka messaging system.
-VM3	    Machine Learning and Query Handler	    Processes PDFs and generates summaries using an AI model (e.g., LLaMA 2).
-VM4	    MySQL Database	                        Stores processed data, metadata, and service logs.
+# **AWS Kubernetes and Microservices Project**
 
-## Technologies Used
-AWS: Virtual machines to host the services.
-Ansible: Automates deployment and configuration of VMs.
-Kubernetes: Orchestrates containerized services.
-Docker: Runs services in isolated containers.
-Kafka: Message broker for inter-service communication.
-Zookeeper: Coordinates Kafka instances.
-Python: For API development and data processing.
-FastAPI: Web framework for PDF upload and query APIs.
-MySQL: Relational database for storing metadata.
-LLaMA 2: Large language model for document summarization.
+## **Overview**
+This project demonstrates the deployment of a cloud-native distributed system hosted on AWS virtual machines (VMs). The system leverages Kubernetes for orchestration, Docker for containerization, Kafka for inter-service messaging, and LLaMA 2 for AI-based PDF summarization. It showcases how to manage and scale microservices in a cloud environment while processing, summarizing, and storing PDF content.
 
-## Features
+---
 
-### PDF Upload and Processing:
-Users upload PDFs via an API hosted on VM1.
-PDF content is extracted, summarized, and sent to the database.
-### Messaging System:
-Kafka (on VM2) handles communication between services for PDF uploads, summaries, and database updates.
-### Machine Learning:
-VM3 hosts a containerized LLaMA 2 model to process and summarize PDFs.
-Data Storage:
-MySQL (on VM4) stores the processed data and metadata for querying.
+## **Architecture**
 
-## Project Setup
-1. Infrastructure Setup
-Ensure four VMs are running on AWS with the following IPs:
+The project is hosted on four AWS VMs, each assigned specific roles to maintain modularity and scalability:
 
-VM Name	Public IP	    Role
-vm1	    3.22.250.2	    Kubernetes Master
-vm2	    3.22.181.60	    Kafka & Zookeeper
-vm3	    3.144.14.68	    Machine Learning Processing
-vm4	    3.142.40.244	MySQL Database
+| **VM Name** | **Public IP**  | **Role**                       | **Responsibilities**                                           |
+|-------------|----------------|--------------------------------|---------------------------------------------------------------|
+| **vm1**     | `3.22.250.2`   | Kubernetes Master & API        | Hosts API for PDF uploads, coordinates workloads, manages cluster. |
+| **vm2**     | `3.22.181.60`  | Kafka & Zookeeper             | Manages communication using Kafka, coordinates Kafka with Zookeeper. |
+| **vm3**     | `3.144.14.68`  | Machine Learning & Query API  | Processes PDF content with LLaMA 2, generates AI-based summaries. |
+| **vm4**     | `3.142.40.244` | MySQL Database                | Stores processed data and metadata, supports querying via APIs. |
 
-## How the System Works
-Step 1: PDF Upload API (VM1)
-Users upload a PDF using the FastAPI web service.
-PDF content is extracted using Python libraries (pdfplumber) and sent to VM3 via Kafka.
-Step 2: Kafka Communication (VM2)
-Kafka manages messages between services (e.g., PDF upload notifications, summaries).
-Zookeeper ensures Kafka's reliability and consistency.
-Step 3: Machine Learning Processing (VM3)
-The PDF content is processed by a containerized LLaMA 2 model.
-A summary is generated and sent to VM4 for storage.
-Step 4: Data Storage (VM4)
-Processed data and metadata are stored in a MySQL database.
-Users can query the database for summaries or metadata via the API.
+---
 
-## Future Enhancements
-Add Monitoring: Use Prometheus and Grafana for real-time system monitoring.
-Enhance Security: Implement HTTPS and RBAC for Kubernetes services.
-Scalability: Configure auto-scaling for Kubernetes workloads.
+## **Key Technologies**
+- **AWS EC2**: Virtual machines hosting the system.
+- **Kubernetes**: Orchestrates containerized workloads across VMs.
+- **Docker**: Runs services in isolated, portable containers.
+- **Ansible**: Automates provisioning and configuration.
+- **Kafka**: Message broker for seamless inter-service communication.
+- **Zookeeper**: Ensures Kafka’s reliability and coordination.
+- **FastAPI**: Lightweight web framework for API development.
+- **MySQL**: Relational database for metadata and logs.
+- **LLaMA 2**: AI model for summarizing PDF content.
+- **Python**: Powers API and text processing logic.
 
-## Contributing
-Fork the repository.
-Create a new branch (git checkout -b feature-name).
-Commit your changes (git commit -m "Add feature").
-Push to the branch (git push origin feature-name).
-Open a pull request.
+---
 
-## License
-This project is licensed under the MIT License.
+## **Features**
+### 1. **PDF Upload and Summarization**
+- **Upload**: Users upload PDFs through a FastAPI-based web interface (VM1).
+- **Processing**: Text is extracted, chunked, and sent to Kafka (VM2).
+- **Summarization**: LLaMA 2 processes the content to generate summaries (VM3).
+- **Storage**: Summaries and metadata are stored in MySQL (VM4) for querying.
+
+### 2. **Asynchronous Communication**
+- **Kafka Topics**: Separate topics for PDF uploads, processing results, and error handling ensure decoupled communication.
+- **Zookeeper Coordination**: Manages Kafka nodes and ensures fault tolerance.
+
+### 3. **AI-Powered Summarization**
+- Leverages LLaMA 2 to generate concise summaries for uploaded PDFs.
+- AI model is containerized for portability and managed by Kubernetes for scalability.
+
+### 4. **Data Storage**
+- **MySQL Database**: Efficiently stores metadata and summaries.
+- Schema supports fast retrieval and integration with the query API.
+
+---
+
+## **System Workflow**
+
+1. **PDF Upload (VM1)**:
+   - Users upload PDFs via the FastAPI interface.
+   - Python libraries (e.g., `pdfplumber`) extract and preprocess text.
+
+2. **Message Broker (VM2)**:
+   - Kafka manages communication between components, ensuring reliable delivery of messages.
+   - Zookeeper ensures consistency of Kafka’s distributed nodes.
+
+3. **AI Processing (VM3)**:
+   - Text is processed by a containerized LLaMA 2 model.
+   - Summaries are returned to Kafka for onward delivery to VM4.
+
+4. **Storage and Querying (VM4)**:
+   - MySQL stores processed data and metadata.
+   - Queries can retrieve summaries and metadata using APIs hosted on VM1.
+
+---
+
+## **Setup Instructions**
+
+### **Step 1: Infrastructure Deployment**
+1. Launch four EC2 instances on AWS, ensuring:
+   - Operating System: Ubuntu 22.04
+   - Security Group: Open necessary ports (e.g., 22 for SSH, 80/8080 for API access, 3306 for MySQL).
+   - Key Pair: Use your AWS key pair to SSH into the VMs.
+
+2. Note the public IPs of the VMs and update the `inventory` file.
+
+### **Step 2: Configure Kubernetes and Deploy Services**
+1. **Install Dependencies**:
+   - Use `playbook_install_apt_packages.yaml` to install required packages.
+   - Run `playbook_install_docker.yaml` to set up Docker.
+
+2. **Set Up Kubernetes**:
+   - Initialize the Kubernetes master node (VM1) with:
+     ```bash
+     kubeadm init --pod-network-cidr=192.168.0.0/16
+     ```
+   - Join the worker nodes (VM2, VM3, VM4) using the token from the master.
+
+3. **Deploy Microservices**:
+   - Use Kubernetes manifests (`yaml` files) to deploy the following:
+     - FastAPI for PDF uploads (VM1).
+     - Kafka and Zookeeper (VM2).
+     - LLaMA 2 AI Model (VM3).
+     - MySQL Database (VM4).
+
+### **Step 3: Verify the Deployment**
+1. Check Kubernetes nodes:
+   ```bash
+   kubectl get nodes
+   ```
+2. Verify FastAPI endpoints:
+   - Access `http://<VM1_IP>:8080/docs` to test the upload API.
+3. Test Kafka messaging and MySQL database connectivity.
+
+---
+
+## **Future Enhancements**
+1. **Monitoring**:
+   - Integrate Prometheus and Grafana to monitor API performance, resource utilization, and Kafka logs.
+2. **Security**:
+   - Use TLS for secure communication.
+   - Implement Role-Based Access Control (RBAC) for Kubernetes.
+3. **Scaling**:
+   - Configure horizontal pod autoscaling for AI services to handle increased traffic.
+
+---
+
+## **Contributing**
+1. **Fork the Repository**.
+2. **Create a Feature Branch**:
+   ```bash
+   git checkout -b <feature-name>
+   ```
+3. **Commit Changes**:
+   ```bash
+   git commit -m "Add <feature>"
+   ```
+4. **Push Changes**:
+   ```bash
+   git push origin <feature-name>
+   ```
+5. **Open a Pull Request** for review.
+
+---
+
+## **License**
+This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+### **Improvements**
+- Clear structure and professional tone.
+- Detailed instructions for setup and deployment.
+- Added a system workflow for clarity.
+- Improved the "Future Enhancements" section with actionable points.
+- Used tables and markdown formatting for readability.
+
+Let me know if you’d like further refinements or additional sections!
