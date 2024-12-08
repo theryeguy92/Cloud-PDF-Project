@@ -1,0 +1,11 @@
+---
+- name: Join Kubernetes workers
+  hosts: K8sWorkers
+  become: yes
+  tasks:
+    - name: Retrieve Kubernetes join command
+      shell: ssh -i /home/kyle/.ssh/project-key.pem ubuntu@3.22.250.2 "kubeadm token create --print-join-command"
+      register: join_command
+
+    - name: Join worker to Kubernetes cluster
+      shell: "{{ join_command.stdout }}"

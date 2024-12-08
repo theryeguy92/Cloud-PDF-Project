@@ -1,0 +1,10 @@
+---
+- name: Download Kafka
+  hosts: vm2
+  become: yes
+  tasks:
+    - name: Download Kafka binaries
+      shell: |
+        wget https://downloads.apache.org/kafka/3.5.1/kafka_2.13-3.5.1.tgz -P /opt/
+        tar -xzf /opt/kafka_2.13-3.5.1.tgz -C /opt/
+        mv /opt/kafka_2.13-3.5.1 /opt/kafka

@@ -1,0 +1,8 @@
+---
+- name: Initialize Kubernetes master
+  hosts: K8sMaster
+  become: yes
+  tasks:
+    - name: Initialize Kubernetes master
+      shell: |
+        kubeadm init --pod-network-cidr=192.168.0.0/16

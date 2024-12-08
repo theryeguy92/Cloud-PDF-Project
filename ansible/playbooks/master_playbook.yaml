@@ -1,0 +1,45 @@
+---
+- name: Master playbook to configure AWS VMs
+  hosts: CloudVMs
+  become: yes
+  tasks:
+    # Disable swap
+    - import_playbook: playbook_disable_swap.yaml
+
+    # Install necessary apt packages
+    - import_playbook: playbook_install_apt_packages.yaml
+
+    # Install Docker
+    - import_playbook: playbook_install_docker.yaml
+
+    # Install Kubernetes packages
+    - import_playbook: playbook_install_k8s_packages.yaml
+
+    # Initialize Kubernetes master (only on VM1)
+    - name: Initialize Kubernetes master
+      import_playbook: playbook_initialize_k8s_master.yaml
+      when: inventory_hostname in groups['K8sMaster']
+
+    # Join Kubernetes workers (VM2, VM3, VM4)
+    - name: Join Kubernetes workers
+      import_playbook: playbook_join_k8s_worker.yaml
+      when: inventory_hostname in groups['K8sWorkers']
+
+    # Install pip packages
+    - import_playbook: playbook_install_pip_packages.yaml
+
+    # Download Kafka (only on VM2)
+    - name: Download Kafka on VM2
+      import_playbook: playbook_download_kafka.yaml
+      when: inventory_hostname == 'vm2'
+
+    # Install Kafka (only on VM2)
+    - name: Install Kafka on VM2
+      import_playbook: playbook_install_kafka.yaml
+      when: inventory_hostname == 'vm2'
+
+    # Update container runtime configuration
+    - import_playbook: playbook_update_config_toml.yaml
+
+    # Setup private Docker registry (optional)
+    - import_playbook: playbook_setup_private_registry.yaml
