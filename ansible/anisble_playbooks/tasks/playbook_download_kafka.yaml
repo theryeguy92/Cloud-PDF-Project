@@ -1,0 +1,5 @@
+---
+- name: "Download Kafka tarball"
+  get_url:
+    url: "https://downloads.apache.org/kafka/3.8.0/kafka_2.13-3.8.0.tgz"
+    dest: "/tmp/kafka_2.13-3.8.0.tgz"

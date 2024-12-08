@@ -1,0 +1,67 @@
+---
+- name: Install firewalld
+  apt:
+    name: firewalld
+    state: present
+    update_cache: yes
+
+- name: Start firewalld
+  service:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Ensure port 22 is open
+  firewalld:
+    port: 22/tcp
+    permanent: yes
+    state: enabled
+  become: true
+
+- name: Allow SSH through the firewall
+  firewalld:
+    service: ssh
+    state: enabled
+    permanent: yes
+
+- name: Allow Kafka ports through the firewall
+  firewalld:
+    port: "{{ item }}"
+    state: enabled
+    permanent: yes
+  loop:
+    - "9092/tcp"
+    - "2181/tcp"
+
+- name: Open port 6443 for Kubernetes API Server
+  firewalld:
+    port: 6443/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Open port 10250 for kubelet
+  firewalld:
+    port: 10250/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Open ports for Kubernetes NodePort Services
+  firewalld:
+    port: 30000-32767/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Open port 5000 for Private Docker Registry
+  firewalld:
+    port: 5000/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Reload firewalld service
+  service:
+    name: firewalld
+    state: reloaded

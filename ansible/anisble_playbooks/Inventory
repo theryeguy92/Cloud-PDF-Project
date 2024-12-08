@@ -1,0 +1,19 @@
+[LocalMC]
+127.0.0.1 ansible_connection=local
+
+[LocalMC:vars]
+local_user=ryan
+
+[CloudVMs]
+3.22.250.2 ansible_user=ubuntu ansible_host=3.22.250.2
+3.22.181.60 ansible_user=ubuntu ansible_host=3.22.181.60
+3.144.14.68 ansible_user=ubuntu ansible_host=3.144.14.68
+3.142.40.244 ansible_user=ubuntu ansible_host=3.142.40.244
+
+[K8sMaster]
+3.22.250.2
+
+[K8sWorkers]
+3.22.181.60
+3.144.14.68
+3.142.40.244

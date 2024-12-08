@@ -1,0 +1,14 @@
+# tasks/playbook_install_apt_packages.yaml
+
+- name: "Update apt package index"
+  apt:
+    update_cache: yes
+
+- name: "Install required APT packages"
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - unzip
+      - curl
+    state: present
