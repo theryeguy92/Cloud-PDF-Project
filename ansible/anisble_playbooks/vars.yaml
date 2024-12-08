@@ -1,0 +1,7 @@
+local_user: ryan
+cloud_user: ubuntu
+cloud_image_name: ami-XXXXX  # Replace with your AWS AMI ID
+cloud_flavor: t2.medium      # Replace with your AWS instance type
+vm_network_name: default     # Update with your VPC or network name
+ssh_key_name: project-key    # Key pair name in AWS
+ansible_ssh_private_key_file: /home/ryan/.ssh/project-key.pem

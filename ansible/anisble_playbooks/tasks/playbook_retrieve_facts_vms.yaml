@@ -1,0 +1,49 @@
+# tasks/playbook_retrieve_facts_vms.yaml
+
+- name: "Gather IP addresses of the VMs"
+  openstack.cloud.server_info:
+    cloud: "{{ openstack_cloud }}"
+    name: "{{ item }}"
+  loop:
+    - "vm1_team2"
+    - "vm2_team2"
+    - "vm3_team2"
+    - "vm4_team2"
+  register: vm_facts
+
+- name: "Debug vm_facts"
+  debug:
+    var: vm_facts
+
+# - name: "Set the IP addresses as variables"
+#   set_fact:
+#     vm_ips_dict: >-
+#       {{
+#         dict(
+#           vm_facts.results
+#           | map('extract', 'servers')
+#           | map('first')
+#           | map(attribute='name')
+#           | zip(
+#             vm_facts.results
+#             | map('extract', 'servers')
+#             | map('first')
+#             | map(attribute='addresses')
+#             | map('dict2items')
+#             | map('map', attribute='value')
+#             | map('flatten')
+#             | map('selectattr', 'OS-EXT-IPS:type', 'equalto', 'fixed')
+#             | map('map', attribute='addr')
+#             | map('first')
+#           )
+#         )
+#       }}
+
+- name: "Set the IP addresses as variables"
+  set_fact:
+    vm_ips_dict: "{{ vm_ips_dict | default({}) | combine({ item.servers[0].name: item.servers[0].addresses[vm_network_name][0]['addr'] }) }}"
+  loop: "{{ vm_facts.results }}"
+
+- name: "Debug vm_ips_dict"
+  debug:
+    var: vm_ips_dict

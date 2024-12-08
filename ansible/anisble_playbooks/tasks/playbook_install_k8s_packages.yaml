@@ -1,0 +1,134 @@
+# tasks/playbook_install_k8s_packages.yaml
+
+- name: Remove old Kubernetes repository file
+  file:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    state: absent
+
+- name: Remove old Kubernetes GPG key
+  file:
+    path: /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+    state: absent
+
+- name: Install dependencies
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: yes
+
+- name: Create directory for apt keyrings
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download and dearmor Kubernetes GPG key
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+  args:
+    executable: /bin/bash
+    creates: /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+
+- name: Add Kubernetes apt repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /"
+    state: present
+    filename: kubernetes.list
+    update_cache: yes
+
+- name: Install Kubernetes packages
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+    update_cache: yes
+
+- name: Install containerd and cri-tools
+  apt:
+    name:
+      - containerd.io
+      - cri-tools
+    state: present
+    update_cache: yes
+
+- name: Create containerd configuration directory
+  file:
+    path: /etc/containerd
+    state: directory
+
+- name: Deploy static containerd config.toml compatible with Kubernetes
+  copy:
+    dest: /etc/containerd/config.toml
+    content: |
+      version = 2
+      [plugins]
+        [plugins."io.containerd.grpc.v1.cri"]
+          sandbox_image = "registry.k8s.io/pause:3.9"
+          [plugins."io.containerd.grpc.v1.cri".containerd]
+            snapshotter = "overlayfs"
+            default_runtime_name = "runc"
+            no_pivot = false
+          [plugins."io.containerd.grpc.v1.cri".cni]
+            bin_dir = "/opt/cni/bin"
+            conf_dir = "/etc/cni/net.d"
+          [plugins."io.containerd.grpc.v1.cri".registry]
+            [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+              [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+                endpoint = ["https://registry-1.docker.io"]
+              [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
+                endpoint = ["https://registry.k8s.io"]
+  notify: Restart containerd
+
+- name: Restart and enable containerd service
+  systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
+
+- name: Ensure br_netfilter and overlay modules are loaded
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: Load br_netfilter and overlay modules
+  shell: |
+    modprobe overlay
+    modprobe br_netfilter
+  args:
+    executable: /bin/bash
+
+- name: Apply sysctl parameters for Kubernetes
+  copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.ipv4.ip_forward = 1
+
+- name: Reload sysctl configuration
+  command: sysctl --system
+
+- name: Hold Kubernetes packages at current version
+  shell: |
+    apt-mark hold kubelet kubeadm kubectl
+  args:
+    executable: /bin/bash
+
+- name: Enable and start kubelet service
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+
+- name: Pre-pull Kubernetes images
+  command: kubeadm config images pull
+  become: true

@@ -1,0 +1,55 @@
+# tasks/playbook_initialize_k8s_master.yaml
+
+- name: Initialize Kubernetes Master
+  command: kubeadm init --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=CRI
+  args:
+    creates: /etc/kubernetes/admin.conf
+  become: true
+
+- name: Set up kubeconfig directory for regular user
+  command: mkdir -p $HOME/.kube
+  become: true
+
+- name: Copy kubeconfig to user directory
+  command: cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  become: true
+
+- name: Get UID of current user
+  command: id -u
+  register: user_uid
+  become: true
+
+- name: Get GID of current user
+  command: id -g
+  register: user_gid
+  become: true
+
+- name: Change ownership of kubeconfig
+  command: chown {{ user_uid.stdout }}:{{ user_gid.stdout }} $HOME/.kube/config
+  become: true
+
+# Install the required Python library for Kubernetes
+- name: Install required Python library for Kubernetes
+  ansible.builtin.command: /usr/bin/pip3 install kubernetes
+  become: true
+
+# Add a short delay to allow the API server to start
+- name: Wait for Kubernetes API server to start
+  wait_for:
+    host: 127.0.0.1
+    port: 6443
+    delay: 15
+    timeout: 60
+    state: started
+  become: true
+
+# Install Calico Network Plugin with retries
+- name: Install Calico Network Plugin
+  kubernetes.core.k8s:
+    state: present
+    src: https://docs.projectcalico.org/manifests/calico.yaml
+  retries: 5
+  delay: 10
+  register: calico_install_result
+  until: calico_install_result is succeeded
+  become: true

@@ -1,0 +1,17 @@
+---
+- name: "Install pip3"
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+
+- name: "Install openstacksdk via pip3"
+  pip:
+    name: openstacksdk
+    executable: pip3
+
+- name: "Install required pip packages"
+  pip:
+    name:
+      - kafka-python
+      - requests

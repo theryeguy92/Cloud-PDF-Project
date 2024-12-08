@@ -1,0 +1,338 @@
+# playbook_master.yaml
+
+# Author: Aniruddha Gokhale
+
+# CS4287/5287 Principles of Cloud Computing
+
+# Created: Fall 2024
+
+# Purpose: Provide a master playbook that imports individual tasks.
+
+################################################################
+### Play 1: Check if required variables are defined.
+################################################################
+
+- name: "Check if required variables are defined"
+  hosts: LocalMC
+  remote_user: "{{ local_user }}"
+  gather_facts: no
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_check_variables.yaml
+
+###############################################################
+### Play 2: Create VMs on the Cloud and Update Inventory
+###############################################################
+
+- name: "Create VMs on Chameleon"
+  hosts: LocalMC
+  remote_user: "{{ local_user }}"
+  gather_facts: no
+  become: false
+  collections:
+    - ansible.builtin
+    - openstack.cloud
+
+  tasks:
+    - name: "Create VMs using OpenStack"
+      os_server:
+        state: present
+        cloud: "{{ openstack_cloud }}"
+        name: "{{ item.name }}"
+        image: "{{ cloud_image_name }}"
+        flavor: "{{ cloud_flavor }}"
+        network: "{{ vm_network_name }}"
+        key_name: "{{ ssh_key_name }}"
+        wait: yes
+      loop:
+        - { name: 'vm1_team2' }
+        - { name: 'vm2_team2' }
+        - { name: 'vm3_team2' }
+        - { name: 'vm4_team2' }
+      register: vm_info
+
+    - name: "Allocate and associate floating IPs"
+      os_floating_ip:
+        cloud: "{{ openstack_cloud }}"
+        server: "{{ item.server.id }}"
+        network: "public"
+        reuse: yes
+      loop: "{{ vm_info.results }}"
+      register: floating_ips
+
+    - name: "Debug floating_ips structure"
+      debug:
+        var: floating_ips
+
+    - name: "Debug VM addresses structure to identify internal IPs"
+      debug:
+        var: item.server.addresses
+      loop: "{{ vm_info.results }}"
+
+    - name: "Extract internal IPs of VMs"
+      set_fact:
+        vm_internal_ips_dict: >-
+          {{
+            dict(
+              vm_info.results | map(attribute='server.name') | zip(
+                vm_info.results
+                | map(attribute='server.addresses')
+                | map('dict2items')
+                | map('map', attribute='value')
+                | map('flatten')
+                | map('selectattr', 'OS-EXT-IPS:type', 'equalto', 'fixed')
+                | map('map', attribute='addr')
+                | map('first')
+              )
+            )
+          }}
+
+    - name: "Debug vm_internal_ips_dict with internal IPs"
+      debug:
+        var: vm_internal_ips_dict
+
+    - name: "Add new VMs to in-memory inventory with internal IPs (CloudVMs group)"
+      add_host:
+        name: "{{ item.key }}"
+        ansible_host: "{{ item.value }}"
+        ansible_user: "{{ cloud_user }}"
+        ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file }}"
+        ansible_ssh_common_args: "{{ ansible_ssh_common_args }}"
+        groups: CloudVMs
+      loop: "{{ vm_internal_ips_dict | dict2items }}"
+
+###############################################################
+### Play 3: Install packages on Cloud VMs and copy OpenStack config
+###############################################################
+
+- name: "Install packages and copy OpenStack config to Cloud VMs with retries"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  become: true
+  gather_facts: no  # Initially set to 'no' to control when facts are gathered
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - name: "Wait for SSH to be available on all Cloud VMs"
+      wait_for_connection:
+        delay: 10
+        timeout: 300
+      register: wait_result
+      until: wait_result is succeeded
+      retries: 5
+      delay: 15
+
+    - name: "Gather facts after ensuring SSH is available"
+      setup:
+      register: setup_status
+      until: setup_status is succeeded
+      retries: 3
+      delay: 10
+
+    - name: "Install required apt packages with retries"
+      import_tasks: tasks/playbook_install_apt_packages.yaml
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
+
+    - name: "Install required pip packages with retries"
+      import_tasks: tasks/playbook_install_pip_packages.yaml
+      register: pip_result
+      until: pip_result is succeeded
+      retries: 3
+      delay: 10
+
+    - name: "Create directory for OpenStack config"
+      file:
+        path: "/home/{{ cloud_user }}/.config/openstack"
+        state: directory
+        owner: "{{ cloud_user }}"
+        group: "{{ cloud_user }}"
+        mode: '0755'
+
+    - name: "Copy clouds.yaml to VMs"
+      copy:
+        src: "/home/{{ local_user }}/.config/openstack/clouds.yaml"
+        dest: "/home/{{ cloud_user }}/.config/openstack/clouds.yaml"
+        owner: "{{ cloud_user }}"
+        group: "{{ cloud_user }}"
+        mode: '0600'
+
+    - name: "Set OS_CLOUD environment variable"
+      lineinfile:
+        path: "/home/{{ cloud_user }}/.bashrc"
+        line: "export OS_CLOUD={{ openstack_cloud }}"
+        create: yes
+
+# ###############################################################
+# ### Play 4: Gather facts from Cloud VMs
+# ###############################################################
+
+# - name: "Perform fact gathering on Cloud VMs"
+#   hosts: CloudVMs
+#   remote_user: "{{ cloud_user }}"
+#   gather_facts: yes
+#   become: false
+#   collections:
+#     - ansible.builtin
+#     - openstack.cloud
+
+#   tasks:
+#     - import_tasks: tasks/playbook_retrieve_facts_vms.yaml
+
+###############################################################
+### Play 5: Install Docker on Cloud VMs
+###############################################################
+
+- name: "Install Docker on Cloud VMs"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  gather_facts: yes
+  become: true
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_install_docker.yaml
+
+###############################################################
+### Play 6: Download and Install Kafka
+###############################################################
+
+- name: "Download Kafka locally"
+  hosts: LocalMC
+  remote_user: "{{ local_user }}"
+  gather_facts: no
+  become: false
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_download_kafka.yaml
+
+- name: "Install Kafka on Cloud VMs"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  gather_facts: no
+  become: true
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_install_kafka.yaml
+
+###############################################################
+### Play 7: Set Firewall Rules
+###############################################################
+
+- name: "Configure Firewall policies"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  become: true
+  gather_facts: no
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_set_firewalld_rules.yaml
+
+###############################################################
+### Play 8: Gather IP addresses of VMs on Control Node
+###############################################################
+
+- name: "Gather IP addresses of the VMs on Control Node"
+  hosts: LocalMC
+  remote_user: "{{ local_user }}"
+  gather_facts: no
+  become: false
+  collections:
+    - openstack.cloud
+
+  tasks:
+    - import_tasks: tasks/playbook_retrieve_facts_vms.yaml
+
+###############################################################
+### Play 9: Install Kubernetes Packages on Cloud VMs
+###############################################################
+
+- name: "Install Kubernetes on Cloud VMs"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  gather_facts: yes
+  become: true
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_install_k8s_packages.yaml
+  
+  handlers:
+    - name: Restart containerd
+      systemd:
+        name: containerd
+        state: restarted
+
+###############################################################
+### Play 10: Set Up Private Docker Registry on VM1
+###############################################################
+
+- name: "Set Up Private Docker Registry on VM1"
+  hosts: vm1_team2
+  remote_user: "{{ cloud_user }}"
+  gather_facts: yes
+  become: true
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_setup_private_registry.yaml
+
+###############################################################
+### Play 11: Disable Swap on Cloud VMs
+###############################################################
+
+- name: "Disable Swap on Cloud VMs"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  gather_facts: yes
+  become: true
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_disable_swap.yaml
+
+###############################################################
+### Play 12: Initialize Kubernetes Master on VM1
+###############################################################
+
+- name: "Initialize Kubernetes Master on VM1"
+  hosts: vm1_team2
+  remote_user: "{{ cloud_user }}"
+  gather_facts: yes
+  become: true
+  collections:
+    - ansible.builtin
+    - kubernetes.core
+
+  tasks:
+    - import_tasks: tasks/playbook_initialize_k8s_master.yaml
+
+###############################################################
+### Play 13: Join Worker Nodes to Kubernetes Cluster
+###############################################################
+
+- name: "Join Worker Nodes to Kubernetes Cluster"
+  hosts: CloudVMs
+  remote_user: "{{ cloud_user }}"
+  gather_facts: yes
+  become: true
+  collections:
+    - ansible.builtin
+
+  tasks:
+    - import_tasks: tasks/playbook_join_k8s_worker.yaml

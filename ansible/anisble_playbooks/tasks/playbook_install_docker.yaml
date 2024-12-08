@@ -1,0 +1,68 @@
+# tasks/playbook_install_docker.yaml
+
+- name: "Install required packages"
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: yes
+
+- name: "Create directory for apt keyrings"
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: "Download Docker GPG key and dearmor"
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /tmp/docker.gpg
+    mode: '0644'
+
+- name: "Dearmor Docker GPG key"
+  command: "gpg --dearmor -o /etc/apt/keyrings/docker.gpg /tmp/docker.gpg"
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+  become: yes
+
+- name: "Set permissions on Docker GPG keyring"
+  file:
+    path: /etc/apt/keyrings/docker.gpg
+    mode: '0644'
+
+- name: "Add Docker repository"
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker.list
+    update_cache: yes
+
+- name: "Install Docker packages"
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: "Check if Docker service is masked"
+  shell: "systemctl is-enabled docker"
+  register: docker_service_status
+  ignore_errors: yes
+
+- name: "Unmask Docker service if masked"
+  command: "systemctl unmask docker"
+  when: docker_service_status.stdout == "masked"
+  ignore_errors: yes
+
+- name: "Start Docker service"
+  service:
+    name: docker
+    state: started
+    enabled: true
