@@ -1,0 +1,35 @@
+all:
+  hosts:
+    vm1:
+      ansible_host: 3.22.250.2
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: /home/ryan/.ssh/project-key.pem
+    vm2:
+      ansible_host: 3.22.181.60
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: /home/ryan/.ssh/project-key.pem
+    vm3:
+      ansible_host: 3.144.14.68
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: /home/ryan/.ssh/project-key.pem
+    vm4:
+      ansible_host: 3.142.40.244
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: /home/ryan/.ssh/project-key.pem
+
+  children:
+    kubernetes:
+      hosts:
+        vm1
+
+    kafka_zookeeper:
+      hosts:
+        vm2
+
+    machine_learning:
+      hosts:
+        vm3
+
+    mysql:
+      hosts:
+        vm4
