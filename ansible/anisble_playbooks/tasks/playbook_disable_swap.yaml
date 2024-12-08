@@ -1,0 +1,19 @@
+- name: Disable swap immediately
+  command: swapoff -a
+
+- name: Comment out swap entry in /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].* swap .*)$'
+    replace: '# \1'
+
+- name: Verify swap is disabled
+  command: swapon --summary
+  register: swap_summary
+
+- name: Ensure swap is disabled
+  assert:
+    that:
+      - swap_summary.stdout == ''
+    fail_msg: "Swap is still enabled!"
+    success_msg: "Swap is successfully disabled."

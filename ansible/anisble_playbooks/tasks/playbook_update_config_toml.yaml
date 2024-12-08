@@ -1,0 +1,21 @@
+- name: Generate new config.toml for containerd
+  command: "containerd config default"
+  register: containerd_config
+
+- name: Update containerd config with registry mirror
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)[[]plugins[.]\"io\.containerd\.grpc\.v1\.cri\"[[]\s*registry\s*[[].*'
+    insertafter: '^version\s*=\s*".*"'
+    line: |
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."myregistrydomain.com:5000"]
+        endpoint = ["http://<vm1_private_ip>:5000"]
+  notify:
+    - Restart containerd
+
+- name: Ensure containerd config file has correct permissions
+  file:
+    path: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: '0644'

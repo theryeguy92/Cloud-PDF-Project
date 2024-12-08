@@ -1,0 +1,11 @@
+---
+- name: "Check if required variables are defined"
+  assert:
+    that:
+      - local_user is defined
+      - cloud_user is defined
+      - cloud_image_name is defined
+      - cloud_flavor is defined
+      - vm_network_name is defined
+    fail_msg: "Required variables are not defined!"
+    success_msg: "All required variables are defined!"
